@@ -118,7 +118,7 @@
         {
          name :: otel_view:name(),
          scope :: opentelemetry:instrumentation_scope(),
-         description :: otel_instrument:description(),
-         unit :: otel_instrument:unit(),
+         description :: otel_instrument:description() | undefined,
+         unit :: otel_instrument:unit() | undefined,
          data :: #sum{} | #gauge{} | #histogram{}
         }).
