@@ -41,8 +41,8 @@ create_instrument(Meter, Name, Kind, Opts) ->
     _ = otel_meter_server:add_instrument(Provider, Instrument),
     Instrument.
 
-lookup_instrument(Meter={_, #meter{instruments_tab=Tab}}, Name) ->
-    try ets:lookup_element(Tab, {Meter, Name}, 2) of
+lookup_instrument({_, #meter{instruments_tab=Tab}}, Name) ->
+    try ets:lookup_element(Tab, Name, 2) of
         Instrument ->
             Instrument
     catch

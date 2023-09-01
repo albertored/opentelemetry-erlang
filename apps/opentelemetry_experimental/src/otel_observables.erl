@@ -50,10 +50,9 @@ run_callbacks(Callbacks, ReaderId, ViewAggregationTab, MetricsTab) ->
 %% lookup ViewAggregations for Instrument and aggregate each observation
 -spec handle_instrument_observations([otel_instrument:observation()], otel_instrument:t(),
                                      ets:table(), ets:table(), reference()) -> ok.
-handle_instrument_observations(Results, #instrument{meter=Meter,
-                                                    name=Name},
+handle_instrument_observations(Results, #instrument{name=Name},
                                ViewAggregationTab, MetricsTab, ReaderId) ->
-    try ets:lookup_element(ViewAggregationTab, {Meter, Name}, 2) of
+    try ets:lookup_element(ViewAggregationTab, Name, 2) of
         ViewAggregations ->
             [handle_observations(MetricsTab, ViewAggregation, Results)
              || #view_aggregation{reader=Id}=ViewAggregation <- ViewAggregations,

@@ -297,9 +297,8 @@ new_view(ViewConfig) ->
                                    }).
 
 %% Match the Instrument to views and then store a per-Reader aggregation for the View
-add_instrument_(InstrumentsTab, CallbacksTab, ViewAggregationsTab, Instrument=#instrument{meter=Meter,
-                                                                                          name=Name}, Views, Readers) ->
-    case ets:insert_new(InstrumentsTab, {{Meter, Name}, Instrument}) of
+add_instrument_(InstrumentsTab, CallbacksTab, ViewAggregationsTab, Instrument=#instrument{name=Name}, Views, Readers) ->
+    case ets:insert_new(InstrumentsTab, {Name, Instrument}) of
         true ->
             update_view_aggregations_(Instrument, CallbacksTab, ViewAggregationsTab, Views, Readers);
         false ->
@@ -314,13 +313,11 @@ update_view_aggregations(InstrumentsTab, CallbacksTab, ViewAggregationsTab, View
                       Acc
               end, ok, InstrumentsTab).
 
-update_view_aggregations_(Instrument=#instrument{meter=Meter,
-                                                 name=Name}, CallbacksTab, ViewAggregationsTab, Views, Readers) ->
-    Key = {Meter, Name},
+update_view_aggregations_(Instrument=#instrument{name=Name}, CallbacksTab, ViewAggregationsTab, Views, Readers) ->
     ViewMatches = otel_view:match_instrument_to_views(Instrument, Views),
     lists:foreach(fun(Reader=#reader{id=ReaderId}) ->
                           Matches = per_reader_aggregations(Reader, Instrument, ViewMatches),
-                          [true = ets:insert(ViewAggregationsTab, {Key, M}) || M <- Matches],
+                          [true = ets:insert(ViewAggregationsTab, {Name, M}) || M <- Matches],
                           case {Instrument#instrument.callback, Instrument#instrument.callback_args} of
                               {undefined, _} ->
                                   ok;
@@ -355,16 +352,15 @@ metric_reader(ReaderId, ReaderPid, DefaultAggregationMapping, Temporality) ->
 %% for each ViewAggregation a Measurement updates a Metric (`#metric')
 %% active metrics are indexed by the ViewAggregation name + the Measurement's Attributes
 
-handle_measurement(#measurement{instrument=#instrument{meter=Meter,
-                                                       name=Name},
+handle_measurement(#measurement{instrument=#instrument{name=Name},
                                 value=Value,
                                 attributes=Attributes},
                    ViewAggregationsTab, MetricsTab) ->
-    Matches = ets:match(ViewAggregationsTab, {{Meter, Name}, '$1'}),
+    Matches = ets:match(ViewAggregationsTab, {Name, '$1'}),
     update_aggregations(Value, Attributes, Matches, MetricsTab).
 
-handle_measurement(Meter, Name, Number, Attributes, ViewAggregationsTab, MetricsTab) ->
-    Matches = ets:match(ViewAggregationsTab, {{Meter, Name}, '$1'}),
+handle_measurement(_Meter, Name, Number, Attributes, ViewAggregationsTab, MetricsTab) ->
+    Matches = ets:match(ViewAggregationsTab, {Name, '$1'}),
     update_aggregations(Number, Attributes, Matches, MetricsTab).
 
 update_aggregations(Value, Attributes, ViewAggregations, MetricsTab) ->
