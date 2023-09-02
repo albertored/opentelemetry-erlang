@@ -261,7 +261,7 @@ code_change(State) ->
 instruments_tab(Name) ->
     ets:new(list_to_atom(lists:concat([instruments, "_", Name])), [set,
                                                                    named_table,
-                                                                   {keypos, 1},
+                                                                   {keypos, 2},
                                                                    protected]).
 
 callbacks_tab(Name) ->
@@ -298,7 +298,7 @@ new_view(ViewConfig) ->
 
 %% Match the Instrument to views and then store a per-Reader aggregation for the View
 add_instrument_(InstrumentsTab, CallbacksTab, ViewAggregationsTab, Instrument=#instrument{name=Name}, Views, Readers) ->
-    case ets:insert_new(InstrumentsTab, {Name, Instrument}) of
+    case ets:insert_new(InstrumentsTab, Instrument) of
         true ->
             update_view_aggregations_(Instrument, CallbacksTab, ViewAggregationsTab, Views, Readers);
         false ->
@@ -308,7 +308,7 @@ add_instrument_(InstrumentsTab, CallbacksTab, ViewAggregationsTab, Instrument=#i
 
 %% used when a new View is added and the Views must be re-matched with each Instrument
 update_view_aggregations(InstrumentsTab, CallbacksTab, ViewAggregationsTab, Views, Readers) ->
-    ets:foldl(fun({_, Instrument}, Acc) ->
+    ets:foldl(fun(Instrument, Acc) ->
                       update_view_aggregations_(Instrument, CallbacksTab, ViewAggregationsTab, Views, Readers),
                       Acc
               end, ok, InstrumentsTab).

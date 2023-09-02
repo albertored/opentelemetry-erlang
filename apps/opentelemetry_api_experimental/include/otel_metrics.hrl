@@ -1,6 +1,6 @@
--record(instrument, {module        :: module(),
+-record(instrument, {name          :: otel_instrument:name(),
+                     module        :: module(),
                      meter         :: otel_meter:t(),
-                     name          :: otel_instrument:name(),
                      description   :: otel_instrument:description() | undefined,
                      kind          :: otel_instrument:kind(),
                      unit          :: otel_instrument:unit() | undefined,

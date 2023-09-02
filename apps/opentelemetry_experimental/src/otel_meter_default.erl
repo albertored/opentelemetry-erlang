@@ -42,12 +42,9 @@ create_instrument(Meter, Name, Kind, Opts) ->
     Instrument.
 
 lookup_instrument({_, #meter{instruments_tab=Tab}}, Name) ->
-    try ets:lookup_element(Tab, Name, 2) of
-        Instrument ->
-            Instrument
-    catch
-        _:_ ->
-            undefined
+    case ets:lookup(Tab, Name) of
+        [Instrument] -> Instrument;
+        _ -> undefined
     end.
 
 -spec create_instrument(otel_meter:t(), otel_instrument:name(), otel_instrument:kind(), otel_instrument:callback(), otel_instrument:callback_args(), otel_meter:opts()) -> otel_instrument:t().
