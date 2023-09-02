@@ -322,14 +322,15 @@ update_view_aggregations_(Instrument=#instrument{name=Name}, CallbacksTab, ViewA
                               {undefined, _} ->
                                   ok;
                               {Callback, CallbackArgs} ->
-                                  ets:insert(CallbacksTab, {ReaderId, {Callback, CallbackArgs, Instrument}})
+                                  ets:insert(CallbacksTab, {ReaderId, {Callback, CallbackArgs, Name}})
                           end
                   end, Readers).
 
 %% Match the Instrument to views and then store a per-Reader aggregation for the View
 register_callback_(CallbacksTab, Instruments, Callback, CallbackArgs, Readers) ->
+    InstrumentNames = lists:map(fun(#instrument{name=Name}) -> Name end, Instruments),
     lists:map(fun(#reader{id=ReaderId}) ->
-                      ets:insert(CallbacksTab, {ReaderId, {Callback, CallbackArgs, Instruments}})
+                      ets:insert(CallbacksTab, {ReaderId, {Callback, CallbackArgs, InstrumentNames}})
               end, Readers).
 
 metric_reader(ReaderId, ReaderPid, DefaultAggregationMapping, Temporality) ->

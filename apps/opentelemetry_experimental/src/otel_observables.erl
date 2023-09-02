@@ -24,35 +24,34 @@
 -include("otel_metrics.hrl").
 -include("otel_view.hrl").
 
--type callbacks() :: [{otel_instrument:callback(), otel_instrument:callback_args(), otel_instrument:t()}].
+-type callbacks() :: [{otel_instrument:callback(), otel_instrument:callback_args(), otel_instrument:name() | [otel_instrument:name()]}].
 
 %% call each callback and associate the result with the Instruments it observes
 -spec run_callbacks(callbacks(), reference(), ets:table(), ets:table()) -> ok.
 run_callbacks(Callbacks, ReaderId, ViewAggregationTab, MetricsTab) ->
-    lists:foreach(fun({Callback, CallbackArgs, Instruments})
-                        when is_list(Instruments) ->
+    lists:foreach(fun({Callback, CallbackArgs, InstrumentNamess})
+                        when is_list(InstrumentNamess) ->
                           Results = Callback(CallbackArgs),
                           handle_instruments_observations(Results,
-                                                          Instruments,
+                                                          InstrumentNamess,
                                                           ViewAggregationTab,
                                                           MetricsTab,
                                                           ReaderId);
-                     ({Callback, CallbackArgs, Instrument}) ->
+                     ({Callback, CallbackArgs, InstrumentNames}) ->
                           Results = Callback(CallbackArgs),
                           %% eqwalizer:ignore we know this is [otel_instrument:observation()] but eqwalizer doesn't
                           handle_instrument_observations(Results,
-                                                         Instrument,
+                                                         InstrumentNames,
                                                          ViewAggregationTab,
                                                          MetricsTab,
                                                          ReaderId)
                   end, Callbacks).
 
 %% lookup ViewAggregations for Instrument and aggregate each observation
--spec handle_instrument_observations([otel_instrument:observation()], otel_instrument:t(),
+-spec handle_instrument_observations([otel_instrument:observation()], otel_instrument:name(),
                                      ets:table(), ets:table(), reference()) -> ok.
-handle_instrument_observations(Results, #instrument{name=Name},
-                               ViewAggregationTab, MetricsTab, ReaderId) ->
-    try ets:lookup_element(ViewAggregationTab, Name, 2) of
+handle_instrument_observations(Results, InstrumentName, ViewAggregationTab, MetricsTab, ReaderId) ->
+    try ets:lookup_element(ViewAggregationTab, InstrumentName, 2) of
         ViewAggregations ->
             [handle_observations(MetricsTab, ViewAggregation, Results)
              || #view_aggregation{reader=Id}=ViewAggregation <- ViewAggregations,
@@ -65,24 +64,24 @@ handle_instrument_observations(Results, #instrument{name=Name},
     end.
 
 %% handle results for a multi-instrument callback
--spec handle_instruments_observations([otel_instrument:named_observations()], [otel_instrument:t()],
+-spec handle_instruments_observations([otel_instrument:named_observations()], [otel_instrument:name()],
                                       ets:table(), ets:table(), reference()) -> ok.
-handle_instruments_observations([], _Instruments, _ViewAggregationTab, _MetricsTab, _ReaderId) ->
+handle_instruments_observations([], _InstrumentNamess, _ViewAggregationTab, _MetricsTab, _ReaderId) ->
     ok;
-handle_instruments_observations([{InstrumentName, Results} | Rest], Instruments,
+handle_instruments_observations([{InstrumentName, Results} | Rest], InstrumentNames,
                                 ViewAggregationTab, MetricsTab, ReaderId) ->
-    case lists:keyfind(InstrumentName, #instrument.name, Instruments) of
+    case lists:search(fun(Name) -> InstrumentName =:= Name end, InstrumentNames) of
         false ->
             ?LOG_DEBUG("Unknown Instrument ~p used in metric callback", [InstrumentName]);
-        Instrument ->
-            handle_instrument_observations(Results, Instrument, ViewAggregationTab, MetricsTab, ReaderId)
+        {value, InstrumentName} ->
+            handle_instrument_observations(Results, InstrumentName, ViewAggregationTab, MetricsTab, ReaderId)
     end,
-    handle_instruments_observations(Rest, Instruments, ViewAggregationTab, MetricsTab, ReaderId);
-handle_instruments_observations([Result | Rest], Instruments, ViewAggregationTab, MetricsTab, ReaderId) ->
+    handle_instruments_observations(Rest, InstrumentNames, ViewAggregationTab, MetricsTab, ReaderId);
+handle_instruments_observations([Result | Rest], InstrumentNames, ViewAggregationTab, MetricsTab, ReaderId) ->
     ?LOG_DEBUG("Each multi-instrument callback result must be a tuple of "
                "type {atom(), [{number(), map()}]} but got ~p", [Result]),
-    handle_instruments_observations(Rest, Instruments, ViewAggregationTab, MetricsTab, ReaderId);
-handle_instruments_observations(Results, _Instruments, _ViewAggregationTab, _MetricsTab, _ReaderId) ->
+    handle_instruments_observations(Rest, InstrumentNames, ViewAggregationTab, MetricsTab, ReaderId);
+handle_instruments_observations(Results, _InstrumentNames, _ViewAggregationTab, _MetricsTab, _ReaderId) ->
     ?LOG_DEBUG("Multi-instrument callback result must be a list of type "
                "[{atom(), [{number(), map()}]}] but got ~p", [Results]),
     ok.
