@@ -83,6 +83,6 @@ record(Instrument=#instrument{meter={_, #meter{view_aggregations_tab=ViewAggrega
                                                metrics_tab=MetricsTab}}}, Number, Attributes) ->
     otel_meter_server:record(ViewAggregationTab, MetricsTab, Instrument, Number, Attributes).
 
-record(Meter={_, #meter{view_aggregations_tab=ViewAggregationTab,
+record({_, #meter{view_aggregations_tab=ViewAggregationTab,
                         metrics_tab=MetricsTab}}, Name, Number, Attributes) ->
-    otel_meter_server:record(Meter, ViewAggregationTab, MetricsTab, Name, Number, Attributes).
+    otel_meter_server:record(ViewAggregationTab, MetricsTab, Name, Number, Attributes).

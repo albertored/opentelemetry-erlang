@@ -14,13 +14,6 @@
          metrics_tab             :: ets:table() | '_'
         }).
 
--record(measurement,
-        {
-         instrument :: otel_instrument:t(),
-         value :: number(),
-         attributes :: opentelemetry:attributes_map()
-        }).
-
 -record(drop_aggregation, {}).
 
 -record(sum_aggregation,

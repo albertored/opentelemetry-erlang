@@ -45,7 +45,6 @@
          add_view/3,
          add_view/4,
          record/5,
-         record/6,
          force_flush/0,
          force_flush/1,
          report_cb/1]).
@@ -144,15 +143,12 @@ add_view(Name, Criteria, Config) ->
 add_view(Provider, Name, Criteria, Config) ->
     gen_server:call(Provider, {add_view, Name, Criteria, Config}).
 
--spec record(ets:table(), ets:table(), otel_instrument:t(), number(), opentelemetry:attributes_map()) -> ok.
-record(ViewAggregationsTab, MetricsTab, Instrument, Number, Attributes) ->
-    handle_measurement(#measurement{instrument=Instrument,
-                                    value=Number,
-                                    attributes=Attributes}, ViewAggregationsTab, MetricsTab).
+-spec record(ets:table(), ets:table(), otel_instrument:t() | otel_instrument:name(), number(), opentelemetry:attributes_map()) -> ok.
+record(ViewAggregationsTab, MetricsTab, #instrument{name=Name}, Number, Attributes) ->
+    handle_measurement(Name, Number, Attributes, ViewAggregationsTab, MetricsTab);
 
--spec record(otel_meter:t(), ets:table(), ets:table(), otel_instrument:t() | otel_instrument:name(), number(), opentelemetry:attributes_map()) -> ok.
-record(Meter, ViewAggregationTab, MetricsTab, Name, Number, Attributes) ->
-    handle_measurement(Meter, Name, Number, Attributes, ViewAggregationTab, MetricsTab).
+record(ViewAggregationsTab, MetricsTab, Name, Number, Attributes) ->
+    handle_measurement(Name, Number, Attributes, ViewAggregationsTab, MetricsTab).
 
 -spec force_flush() -> ok.
 force_flush() ->
@@ -353,14 +349,7 @@ metric_reader(ReaderId, ReaderPid, DefaultAggregationMapping, Temporality) ->
 %% for each ViewAggregation a Measurement updates a Metric (`#metric')
 %% active metrics are indexed by the ViewAggregation name + the Measurement's Attributes
 
-handle_measurement(#measurement{instrument=#instrument{name=Name},
-                                value=Value,
-                                attributes=Attributes},
-                   ViewAggregationsTab, MetricsTab) ->
-    Matches = ets:match(ViewAggregationsTab, {Name, '$1'}),
-    update_aggregations(Value, Attributes, Matches, MetricsTab).
-
-handle_measurement(_Meter, Name, Number, Attributes, ViewAggregationsTab, MetricsTab) ->
+handle_measurement(Name, Number, Attributes, ViewAggregationsTab, MetricsTab) ->
     Matches = ets:match(ViewAggregationsTab, {Name, '$1'}),
     update_aggregations(Number, Attributes, Matches, MetricsTab).
 
