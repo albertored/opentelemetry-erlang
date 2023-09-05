@@ -19,7 +19,7 @@
 
 -export([new/2,
          new/3,
-         match_instrument_to_views/2]).
+         match_instrument_to_view_aggregations/2]).
 
 -include_lib("opentelemetry_api_experimental/include/otel_metrics.hrl").
 -include_lib("opentelemetry_api/include/opentelemetry.hrl").
@@ -74,17 +74,18 @@ new(Name, Criteria, Config) ->
     View = new(Criteria, Config),
     View#view{name=Name}.
 
--dialyzer({nowarn_function,match_instrument_to_views/2}).
--spec match_instrument_to_views(otel_instrument:t(), [t()]) -> [{t() | undefined, #view_aggregation{}}].
-match_instrument_to_views(Instrument=#instrument{name=InstrumentName,
+-dialyzer({nowarn_function,match_instrument_to_view_aggregations/2}).
+-spec match_instrument_to_view_aggregations(otel_instrument:t(), [t()]) -> [#view_aggregation{}].
+match_instrument_to_view_aggregations(Instrument=#instrument{name=InstrumentName,
                                                  meter=Meter,
                                                  description=Description}, Views) ->
     IsMonotonic = otel_instrument:is_monotonic(Instrument),
     Temporality = otel_instrument:temporality(Instrument),
     Scope = otel_meter:scope(Meter),
-    case lists:filtermap(fun(View=#view{name=ViewName,
+    case lists:filtermap(fun(#view{name=ViewName,
                                         description=ViewDescription,
                                         attribute_keys=AttributeKeys,
+                                        aggregation_module=AggregationModule,
                                         aggregation_options=AggregationOptions,
                                         instrument_matchspec=Matchspec}) ->
                                  case ets:match_spec_run([Instrument], Matchspec) of
@@ -94,28 +95,28 @@ match_instrument_to_views(Instrument=#instrument{name=InstrumentName,
                                          %% `reader' needs to be undefined and is set
                                          %% for each in `otel_meter_server'
                                          %% eqwalizer:ignore see above
-                                         {true, {View, #view_aggregation{name=value_or(ViewName,
-                                                                                       InstrumentName),
-                                                                         scope=Scope,
-                                                                         instrument=Instrument,
-                                                                         temporality=Temporality,
-                                                                         is_monotonic=IsMonotonic,
-                                                                         attribute_keys=AttributeKeys,
-                                                                         aggregation_options=AggregationOptions,
-                                                                         description=value_or(ViewDescription,
-                                                                                              Description)
-                                                                        }}}
+                                         {true, #view_aggregation{name=value_or(ViewName, InstrumentName),
+                                                                  scope=Scope,
+                                                                  instrument=Instrument,
+                                                                  temporality=Temporality,
+                                                                  is_monotonic=IsMonotonic,
+                                                                  attribute_keys=AttributeKeys,
+                                                                  aggregation_module=AggregationModule,
+                                                                  aggregation_options=AggregationOptions,
+                                                                  description=value_or(ViewDescription, Description)
+                                                                 }}
                                  end
                          end, Views) of
         [] ->
-            [{undefined, #view_aggregation{name=InstrumentName,
-                                           scope=Scope,
-                                           instrument=Instrument,
-                                           temporality=Temporality,
-                                           is_monotonic=IsMonotonic,
-                                           attribute_keys=undefined,
-                                           aggregation_options=#{},
-                                           description=Description}}];
+            [#view_aggregation{name=InstrumentName,
+                               scope=Scope,
+                               instrument=Instrument,
+                               temporality=Temporality,
+                               is_monotonic=IsMonotonic,
+                               attribute_keys=undefined,
+                               aggregation_module=undefined,
+                               aggregation_options=#{},
+                               description=Description}];
         Aggs ->
             Aggs
     end.

@@ -77,8 +77,6 @@
          default_temporality_mapping :: map()
         }).
 
--type reader() :: #reader{}.
-
 -type view_config() :: #{name => otel_instrument:name() | undefined,
                          description => unicode:unicode_binary() | undefined,
                          selector => otel_view:criteria(),
@@ -310,9 +308,9 @@ update_view_aggregations(InstrumentsTab, CallbacksTab, ViewAggregationsTab, View
               end, ok, InstrumentsTab).
 
 update_view_aggregations_(Instrument=#instrument{name=Name}, CallbacksTab, ViewAggregationsTab, Views, Readers) ->
-    ViewMatches = otel_view:match_instrument_to_views(Instrument, Views),
+    ViewAggregationMatches = otel_view:match_instrument_to_view_aggregations(Instrument, Views),
     lists:foreach(fun(Reader=#reader{id=ReaderId}) ->
-                          Matches = per_reader_aggregations(Reader, Instrument, ViewMatches),
+                          Matches = per_reader_aggregations(Reader, Instrument, ViewAggregationMatches),
                           [true = ets:insert(ViewAggregationsTab, {Name, M}) || M <- Matches],
                           case {Instrument#instrument.callback, Instrument#instrument.callback_args} of
                               {undefined, _} ->
@@ -365,48 +363,30 @@ update_aggregations(Value, Attributes, ViewAggregations, MetricsTab) ->
 
 %% create an aggregation for each Reader and its possibly unique aggregation/temporality
 per_reader_aggregations(Reader, Instrument, ViewAggregations) ->
-    [view_aggregation_for_reader(Instrument, ViewAggregation, View, Reader)
-     || {View, ViewAggregation} <- ViewAggregations].
+    [view_aggregation_for_reader(Instrument, ViewAggregation, Reader) || ViewAggregation <- ViewAggregations].
 
-view_aggregation_for_reader(Instrument=#instrument{kind=Kind}, ViewAggregation, View=#view{attribute_keys=AttributeKeys},
-                            Reader=#reader{id=Id,
-                                           default_temporality_mapping=ReaderTemporalityMapping}) ->
-    AggregationModule = aggregation_module(Instrument, View, Reader),
+view_aggregation_for_reader(#instrument{kind=Kind}, ViewAggregation,
+                            #reader{id=Id,
+                                    default_temporality_mapping=ReaderTemporalityMapping,
+                                    default_aggregation_mapping=ReaderAggregationMapping}) ->
+    AggregationModule = aggregation_module(ViewAggregation, Kind, ReaderAggregationMapping),
     Temporality = maps:get(Kind, ReaderTemporalityMapping, ?TEMPORALITY_CUMULATIVE),
 
     ViewAggregation#view_aggregation{
       reader=Id,
-      attribute_keys=AttributeKeys,
-      aggregation_module=AggregationModule,
-      aggregation_options=#{},
-      temporality=Temporality};
-view_aggregation_for_reader(Instrument=#instrument{kind=Kind}, ViewAggregation, View,
-                            Reader=#reader{id=Id,
-                                           default_temporality_mapping=ReaderTemporalityMapping}) ->
-    AggregationModule = aggregation_module(Instrument, View, Reader),
-    Temporality = maps:get(Kind, ReaderTemporalityMapping, ?TEMPORALITY_CUMULATIVE),
-
-    ViewAggregation#view_aggregation{
-      reader=Id,
-      attribute_keys=undefined,
       aggregation_module=AggregationModule,
       aggregation_options=#{},
       temporality=Temporality}.
-
 
 %% no aggregation defined for the View, so get the aggregation from the Reader
 %% the Reader's mapping of Instrument Kind to Aggregation was merged with the
 %% global default, so any missing Kind entries are filled in from the global
 %% mapping in `otel_aggregation'
--spec aggregation_module(otel_instrument:t(), otel_view:t(), reader()) -> module().
-aggregation_module(#instrument{kind=Kind}, undefined,
-                   #reader{default_aggregation_mapping=ReaderAggregationMapping}) ->
+-spec aggregation_module(#view_aggregation{}, otel_instrument:kind(), map()) -> module().
+aggregation_module(#view_aggregation{aggregation_module=undefined}, Kind, ReaderAggregationMapping) ->
     maps:get(Kind, ReaderAggregationMapping);
-aggregation_module(#instrument{kind=Kind}, #view{aggregation_module=undefined},
-                   #reader{default_aggregation_mapping=ReaderAggregationMapping}) ->
-    maps:get(Kind, ReaderAggregationMapping);
-aggregation_module(_Instrument, #view{aggregation_module=Module}, _Reader) ->
-    Module.
+aggregation_module(#view_aggregation{aggregation_module=AggregationModule}, _Kind, _ReaderAggregationMapping) ->
+    AggregationModule.
 
 report_cb(#{instrument_name := Name,
             class := Class,

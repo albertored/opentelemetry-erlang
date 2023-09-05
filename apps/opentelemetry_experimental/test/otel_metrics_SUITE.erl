@@ -437,14 +437,14 @@ view_creation_test(_Config) ->
     %% view name becomes the instrument name
     ?assertEqual(a_counter, View#view.name),
 
-    Matches = otel_view:match_instrument_to_views(Counter, [View]),
-    ?assertMatch([_], Matches),
+    Matches = otel_view:match_instrument_to_view_aggregations(Counter, [View]),
+    ?assertMatch([#view_aggregation{aggregation_module=otel_aggregation_sum}], Matches),
 
     ViewUnitMatch = otel_view:new(#{instrument_name => CounterName, instrument_unit => CounterUnit}, #{aggregation_module => otel_aggregation_sum}),
-    ?assertMatch([{#view{}, _}], otel_view:match_instrument_to_views(Counter, [ViewUnitMatch])),
+    ?assertMatch([#view_aggregation{aggregation_module=otel_aggregation_sum}], otel_view:match_instrument_to_view_aggregations(Counter, [ViewUnitMatch])),
 
     ViewUnitNotMatch = otel_view:new(#{instrument_name => CounterName, instrument_unit => not_matching}, #{aggregation_module => otel_aggregation_sum}),
-    ?assertMatch([{undefined, _}], otel_view:match_instrument_to_views(Counter, [ViewUnitNotMatch])),
+    ?assertMatch([#view_aggregation{aggregation_module=undefined}], otel_view:match_instrument_to_view_aggregations(Counter, [ViewUnitNotMatch])),
 
     %% views require a unique name
     ?assert(otel_meter_server:add_view(view_b, #{instrument_name => a_counter}, #{aggregation_module => otel_aggregation_sum})),
